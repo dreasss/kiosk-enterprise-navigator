@@ -1,9 +1,8 @@
-
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Settings, News, Image as ImageIcon, Map, Rss, Building, Palette, ArrowLeft } from 'lucide-react';
+import { Settings, Newspaper, Image as ImageIcon, Map, Rss, Building, Palette, ArrowLeft } from 'lucide-react';
 import AdminNews from './AdminNews';
 import AdminGallery from './AdminGallery';
 import AdminMap from './AdminMap';
@@ -17,7 +16,7 @@ const AdminPanel = () => {
 
   const adminMenuItems = [
     {
-      icon: News,
+      icon: Newspaper,
       title: 'Управление новостями',
       description: 'Добавление, редактирование и удаление новостей предприятия',
       path: '/admin/news',

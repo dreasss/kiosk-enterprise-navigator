@@ -1,6 +1,5 @@
-
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Map, News, Image, Search, Settings } from 'lucide-react';
+import { Home, Map, Newspaper, Image, Search, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const Navigation = () => {
@@ -9,7 +8,7 @@ const Navigation = () => {
   const menuItems = [
     { icon: Home, label: 'Главная', path: '/' },
     { icon: Map, label: 'Карта', path: '/map' },
-    { icon: News, label: 'Новости', path: '/news' },
+    { icon: Newspaper, label: 'Новости', path: '/news' },
     { icon: Image, label: 'Галерея', path: '/gallery' },
     { icon: Search, label: 'Поиск', path: '/search' },
     { icon: Settings, label: 'О предприятии', path: '/about' },

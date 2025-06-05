@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 
 const NewsMarquee = () => {
-  const [newsItems, setNewsItems] = useState([]);
+  const [newsItems, setNewsItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -26,9 +26,9 @@ const NewsMarquee = () => {
 
         // Объединение и сортировка новостей
         const allNews = [...internalNews, ...rssNews]
-          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
           .slice(0, 10)
-          .map(item => item.title);
+          .map((item: any) => item.title);
 
         setNewsItems(allNews.length > 0 ? allNews : ['Добро пожаловать в информационную систему предприятия']);
       } catch (error) {
@@ -58,18 +58,20 @@ const NewsMarquee = () => {
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 overflow-hidden relative">
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
-      <div className="marquee-container">
-        <div className="marquee-content">
-          {newsItems.map((item, index) => (
-            <span key={index} className="mx-8 text-lg font-medium whitespace-nowrap">
-              • {item}
-            </span>
-          ))}
+    <>
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
+        <div className="marquee-container">
+          <div className="marquee-content">
+            {newsItems.map((item, index) => (
+              <span key={index} className="mx-8 text-lg font-medium whitespace-nowrap">
+                • {item}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
-      <style jsx>{`
+      <style>{`
         .marquee-container {
           width: 100%;
           overflow: hidden;
@@ -83,7 +85,7 @@ const NewsMarquee = () => {
           100% { transform: translateX(-100%); }
         }
       `}</style>
-    </div>
+    </>
   );
 };
 
