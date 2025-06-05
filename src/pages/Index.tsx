@@ -35,6 +35,30 @@ const Index = () => {
     };
   }, [toast]);
 
+  useEffect(() => {
+    // Загрузка Яндекс.Карт
+    if (!window.ymaps) {
+      const script = document.createElement('script');
+      script.src = 'https://api-maps.yandex.ru/2.1/?apikey=&lang=ru_RU';
+      script.async = true;
+      document.head.appendChild(script);
+
+      script.onload = () => {
+        console.log('Яндекс.Карты загружены');
+      };
+
+      script.onerror = () => {
+        console.error('Ошибка загрузки Яндекс.Карт');
+      };
+
+      return () => {
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      };
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       <TopNavigation />
