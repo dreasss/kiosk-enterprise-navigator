@@ -4,10 +4,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Search, Navigation as NavigationIcon, MapPin, QrCode, Download, Filter, BarChart3, Clock, Route } from 'lucide-react';
+import { Search, Navigation as NavigationIcon, MapPin, QrCode, Download, Filter, BarChart3, Clock, Route, Upload, Camera, Palette } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import QRCode from 'qrcode';
 import { AnimatedButton } from './ui/animated-button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Label } from './ui/label';
 
 interface MapObject {
   id: string;
@@ -18,6 +20,9 @@ interface MapObject {
   floor?: string;
   capacity?: string;
   workingHours?: string;
+  photos?: string[];
+  customIcon?: string;
+  iconColor?: string;
 }
 
 const MapPage = () => {
@@ -30,6 +35,8 @@ const MapPage = () => {
   const [routeQRCode, setRouteQRCode] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [recentRoutes, setRecentRoutes] = useState([]);
+  const [editingObject, setEditingObject] = useState<MapObject | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const mapRef = useRef<any>(null);
   const mapInstanceRef = useRef<any>(null);
   const currentLocationRef = useRef<any>(null);
@@ -40,14 +47,23 @@ const MapPage = () => {
   const currentLocation: [number, number] = [56.742252, 37.191930];
 
   const objectTypes = [
-    { value: 'all', label: 'Все объекты', color: '#6366f1', count: 0 },
-    { value: 'building', label: 'Здания', color: '#0066CC', count: 0 },
-    { value: 'production', label: 'Производство', color: '#CC0000', count: 0 },
-    { value: 'warehouse', label: 'Склады', color: '#996633', count: 0 },
-    { value: 'cafeteria', label: 'Столовые', color: '#00CC66', count: 0 },
-    { value: 'parking', label: 'Парковки', color: '#666666', count: 0 },
-    { value: 'office', label: 'Офисы', color: '#ff6b35', count: 0 },
-    { value: 'security', label: 'Охрана', color: '#8b5cf6', count: 0 }
+    { value: 'all', label: 'Все объекты', color: '#6366f1', icon: '🏢', count: 0 },
+    { value: 'building', label: 'Здания', color: '#0066CC', icon: '🏢', count: 0 },
+    { value: 'production', label: 'Производство', color: '#CC0000', icon: '🏭', count: 0 },
+    { value: 'warehouse', label: 'Склады', color: '#996633', icon: '📦', count: 0 },
+    { value: 'cafeteria', label: 'Столовые', color: '#00CC66', icon: '🍽️', count: 0 },
+    { value: 'parking', label: 'Парковки', color: '#666666', icon: '🚗', count: 0 },
+    { value: 'office', label: 'Офисы', color: '#ff6b35', icon: '💼', count: 0 },
+    { value: 'security', label: 'Охрана', color: '#8b5cf6', icon: '🛡️', count: 0 }
+  ];
+
+  const predefinedIcons = [
+    '🏢', '🏭', '📦', '🍽️', '🚗', '💼', '🛡️', '🏪', '🏥', '🎯', '⚡', '🔧', '📋', '💻', '📞'
+  ];
+
+  const predefinedColors = [
+    '#0066CC', '#CC0000', '#996633', '#00CC66', '#666666', '#ff6b35', '#8b5cf6',
+    '#e74c3c', '#f39c12', '#2ecc71', '#3498db', '#9b59b6', '#1abc9c', '#34495e'
   ];
 
   useEffect(() => {
@@ -68,7 +84,8 @@ const MapPage = () => {
               type: 'building',
               floor: '1-5',
               capacity: '200 сотрудников',
-              workingHours: '08:00-18:00'
+              workingHours: '08:00-18:00',
+              photos: []
             },
             {
               id: '2',
@@ -78,7 +95,8 @@ const MapPage = () => {
               type: 'production',
               floor: '1',
               capacity: '50 рабочих мест',
-              workingHours: '24/7'
+              workingHours: '24/7',
+              photos: []
             },
             {
               id: '3',
@@ -88,7 +106,8 @@ const MapPage = () => {
               type: 'warehouse',
               floor: '1',
               capacity: '1000 м²',
-              workingHours: '06:00-22:00'
+              workingHours: '06:00-22:00',
+              photos: []
             },
             {
               id: '4',
@@ -98,7 +117,8 @@ const MapPage = () => {
               type: 'cafeteria',
               floor: '1',
               capacity: '150 посадочных мест',
-              workingHours: '08:00-17:00'
+              workingHours: '08:00-17:00',
+              photos: []
             },
             {
               id: '5',
@@ -108,27 +128,8 @@ const MapPage = () => {
               type: 'parking',
               floor: '0',
               capacity: '80 мест',
-              workingHours: '24/7'
-            },
-            {
-              id: '6',
-              name: 'IT-центр',
-              description: 'Информационные технологии',
-              coordinates: [56.742102, 37.192180],
-              type: 'office',
-              floor: '3',
-              capacity: '30 сотрудников',
-              workingHours: '09:00-18:00'
-            },
-            {
-              id: '7',
-              name: 'Пост охраны',
-              description: 'Контрольно-пропускной пункт',
-              coordinates: [56.742052, 37.191680],
-              type: 'security',
-              floor: '1',
-              capacity: '2 охранника',
-              workingHours: '24/7'
+              workingHours: '24/7',
+              photos: []
             }
           ];
           setMapObjects(demoObjects);
@@ -155,12 +156,12 @@ const MapPage = () => {
   }, []);
 
   useEffect(() => {
-    // Инициализация Яндекс.Карт
+    // Инициализация Яндекс.Карт с улучшенными всплывающими окнами
     const initializeMap = () => {
       if (window.ymaps && mapRef.current && !isMapLoaded) {
         window.ymaps.ready(() => {
           const map = new window.ymaps.Map(mapRef.current, {
-            center: currentLocation, // Центрируем на "Вы здесь"
+            center: currentLocation,
             zoom: 17,
             controls: ['zoomControl', 'fullscreenControl']
           });
@@ -172,12 +173,11 @@ const MapPage = () => {
           const currentLocationPlacemark = new window.ymaps.Placemark(
             currentLocation,
             {
-              balloonContent: `
-                <div style="text-align: center;">
-                  <h3 style="color: #e74c3c; margin: 0;">📍 Вы здесь</h3>
-                  <p style="margin: 5px 0;">Ваше текущее местоположение</p>
-                </div>
-              `,
+              balloonContent: createBalloonContent({
+                name: '📍 Вы здесь',
+                description: 'Ваше текущее местоположение',
+                type: 'current'
+              }),
               hintContent: '📍 Вы здесь'
             },
             {
@@ -189,25 +189,20 @@ const MapPage = () => {
           currentLocationRef.current = currentLocationPlacemark;
           map.geoObjects.add(currentLocationPlacemark);
 
-          // Добавление объектов на карту
+          // Добавление объектов на карту с улучшенными всплывающими окнами
           mapObjects.forEach(obj => {
             const placemark = new window.ymaps.Placemark(
               obj.coordinates,
               {
-                balloonContent: `
-                  <div style="max-width: 300px;">
-                    <h3 style="margin: 0 0 10px 0; color: #1f2937;">${obj.name}</h3>
-                    <p style="margin: 0 0 8px 0; color: #6b7280;">${obj.description}</p>
-                    ${obj.floor ? `<p style="margin: 4px 0;"><strong>Этаж:</strong> ${obj.floor}</p>` : ''}
-                    ${obj.capacity ? `<p style="margin: 4px 0;"><strong>Вместимость:</strong> ${obj.capacity}</p>` : ''}
-                    ${obj.workingHours ? `<p style="margin: 4px 0;"><strong>Режим работы:</strong> ${obj.workingHours}</p>` : ''}
-                  </div>
-                `,
+                balloonContent: createBalloonContent(obj),
                 hintContent: obj.name
               },
               {
-                preset: getPresetByType(obj.type),
-                iconColor: getColorByType(obj.type)
+                preset: obj.customIcon ? null : getPresetByType(obj.type),
+                iconColor: obj.iconColor || getColorByType(obj.type),
+                iconImageHref: obj.customIcon || undefined,
+                iconImageSize: obj.customIcon ? [32, 32] : undefined,
+                iconImageOffset: obj.customIcon ? [-16, -16] : undefined
               }
             );
 
@@ -225,6 +220,53 @@ const MapPage = () => {
       initializeMap();
     }
   }, [mapObjects, isMapLoaded]);
+
+  const createBalloonContent = (obj: any) => {
+    const photos = obj.photos && obj.photos.length > 0 
+      ? obj.photos.map(photo => `<img src="${photo}" style="width: 100%; max-width: 200px; height: 120px; object-fit: cover; border-radius: 8px; margin: 5px 0;" />`).join('')
+      : '';
+
+    return `
+      <div style="max-width: 320px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border-radius: 12px 12px 0 0; margin: -10px -10px 10px -10px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">${obj.name}</h3>
+        </div>
+        <div style="padding: 0 5px;">
+          <p style="margin: 8px 0; color: #4b5563; line-height: 1.4;">${obj.description}</p>
+          ${photos}
+          ${obj.floor ? `<div style="margin: 6px 0; padding: 4px 8px; background: #f3f4f6; border-radius: 6px; display: inline-block;"><strong>Этаж:</strong> ${obj.floor}</div>` : ''}
+          ${obj.capacity ? `<div style="margin: 6px 0; padding: 4px 8px; background: #f3f4f6; border-radius: 6px; display: inline-block;"><strong>Вместимость:</strong> ${obj.capacity}</div>` : ''}
+          ${obj.workingHours ? `<div style="margin: 6px 0; padding: 4px 8px; background: #f3f4f6; border-radius: 6px; display: inline-block;"><strong>Режим работы:</strong> ${obj.workingHours}</div>` : ''}
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button onclick="window.setRouteFrom('${obj.id}')" style="flex: 1; background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Откуда</button>
+            <button onclick="window.setRouteTo('${obj.id}')" style="flex: 1; background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Куда</button>
+            <button onclick="window.editObject('${obj.id}')" style="background: #f59e0b; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">✏️</button>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  // Глобальные функции для использования в всплывающих окнах
+  useEffect(() => {
+    (window as any).setRouteFrom = (objId: string) => {
+      const obj = mapObjects.find(o => o.id === objId);
+      if (obj) setRouteFrom(obj);
+    };
+    
+    (window as any).setRouteTo = (objId: string) => {
+      const obj = mapObjects.find(o => o.id === objId);
+      if (obj) setRouteTo(obj);
+    };
+
+    (window as any).editObject = (objId: string) => {
+      const obj = mapObjects.find(o => o.id === objId);
+      if (obj) {
+        setEditingObject(obj);
+        setIsEditDialogOpen(true);
+      }
+    };
+  }, [mapObjects]);
 
   const getPresetByType = (type: string) => {
     const presets = {
@@ -269,10 +311,8 @@ const MapPage = () => {
 
   const generateRouteQR = async (from: MapObject, to: MapObject) => {
     try {
-      // Создаем URL для открытия маршрута в картах
       const mapsUrl = `https://yandex.ru/maps/?rtext=${from.coordinates[0]},${from.coordinates[1]}~${to.coordinates[0]},${to.coordinates[1]}&rtt=pd`;
       
-      // Генерируем QR-код
       const qrCodeDataUrl = await QRCode.toDataURL(mapsUrl, {
         width: 200,
         margin: 2,
@@ -332,7 +372,8 @@ const MapPage = () => {
     routeRef.current = multiRoute;
     mapInstanceRef.current.geoObjects.add(multiRoute);
 
-    // Генерируем QR-код для маршрута
+    // Сохраняем в историю и генерируем QR-код
+    saveRecentRoute(routeFrom, routeTo);
     await generateRouteQR(routeFrom, routeTo);
 
     toast({
@@ -370,6 +411,54 @@ const MapPage = () => {
     }
   };
 
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>, objId: string) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const readers = Array.from(files).map(file => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(readers).then(results => {
+        const updatedObjects = mapObjects.map(obj => {
+          if (obj.id === objId) {
+            return {
+              ...obj,
+              photos: [...(obj.photos || []), ...results]
+            };
+          }
+          return obj;
+        });
+        setMapObjects(updatedObjects);
+        localStorage.setItem('map_objects', JSON.stringify(updatedObjects));
+        
+        toast({
+          title: "Фотографии добавлены",
+          description: `Добавлено ${results.length} фотографий`
+        });
+      });
+    }
+  };
+
+  const updateObject = (updatedObj: MapObject) => {
+    const updatedObjects = mapObjects.map(obj => 
+      obj.id === updatedObj.id ? updatedObj : obj
+    );
+    setMapObjects(updatedObjects);
+    localStorage.setItem('map_objects', JSON.stringify(updatedObjects));
+    setIsEditDialogOpen(false);
+    setEditingObject(null);
+    
+    // Перезагружаем карту для обновления иконок
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.geoObjects.removeAll();
+      setIsMapLoaded(false);
+    }
+  };
+
   const getTypeStats = () => {
     const stats = { ...Object.fromEntries(objectTypes.map(t => [t.value, 0])) };
     mapObjects.forEach(obj => {
@@ -380,8 +469,9 @@ const MapPage = () => {
   };
 
   const filteredObjects = mapObjects.filter(obj =>
-    obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    obj.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (activeFilter === 'all' || obj.type === activeFilter) &&
+    (obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+     obj.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const stats = getTypeStats();
@@ -424,7 +514,7 @@ const MapPage = () => {
                     }}
                     onClick={() => setActiveFilter(type.value)}
                   >
-                    <Filter className="w-3 h-3 mr-1" />
+                    <span className="mr-1">{type.icon}</span>
                     {type.label} ({stats[type.value] || 0})
                   </Badge>
                 ))}
@@ -459,9 +549,10 @@ const MapPage = () => {
                         <div className="flex items-center space-x-2">
                           <Badge 
                             variant="outline" 
-                            style={{ borderColor: getColorByType(obj.type), color: getColorByType(obj.type) }}
+                            style={{ borderColor: obj.iconColor || getColorByType(obj.type), color: obj.iconColor || getColorByType(obj.type) }}
                             className="text-xs"
                           >
+                            <span className="mr-1">{objectTypes.find(t => t.value === obj.type)?.icon}</span>
                             {objectTypes.find(t => t.value === obj.type)?.label}
                           </Badge>
                           {obj.workingHours && (
@@ -496,6 +587,33 @@ const MapPage = () => {
                       >
                         Куда
                       </AnimatedButton>
+                      <AnimatedButton
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingObject(obj);
+                          setIsEditDialogOpen(true);
+                        }}
+                        className="text-xs"
+                      >
+                        ✏️
+                      </AnimatedButton>
+                    </div>
+                    
+                    {/* Быстрая загрузка фото */}
+                    <div className="mt-2">
+                      <label className="flex items-center justify-center space-x-2 p-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
+                        <Camera className="w-4 h-4 text-gray-400" />
+                        <span className="text-xs text-gray-500">Добавить фото</span>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handlePhotoUpload(e, obj.id)}
+                        />
+                      </label>
                     </div>
                   </div>
                 ))}
@@ -570,10 +688,7 @@ const MapPage = () => {
                   {objectTypes.filter(t => t.value !== 'all').map(type => (
                     <div key={type.value} className="flex items-center justify-between p-2 bg-white border rounded">
                       <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: type.color }}
-                        />
+                        <span className="text-lg">{type.icon}</span>
                         <span className="text-sm">{type.label}</span>
                       </div>
                       <Badge variant="secondary">{stats[type.value] || 0}</Badge>
@@ -616,6 +731,166 @@ const MapPage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Диалог редактирования объекта */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Редактировать объект</DialogTitle>
+          </DialogHeader>
+          {editingObject && (
+            <div className="space-y-4">
+              <div>
+                <Label>Название</Label>
+                <Input
+                  value={editingObject.name}
+                  onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label>Описание</Label>
+                <Input
+                  value={editingObject.description}
+                  onChange={(e) => setEditingObject({...editingObject, description: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Этаж</Label>
+                  <Input
+                    value={editingObject.floor || ''}
+                    onChange={(e) => setEditingObject({...editingObject, floor: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Вместимость</Label>
+                  <Input
+                    value={editingObject.capacity || ''}
+                    onChange={(e) => setEditingObject({...editingObject, capacity: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Режим работы</Label>
+                <Input
+                  value={editingObject.workingHours || ''}
+                  onChange={(e) => setEditingObject({...editingObject, workingHours: e.target.value})}
+                />
+              </div>
+
+              {/* Выбор иконки */}
+              <div>
+                <Label>Иконка</Label>
+                <div className="grid grid-cols-8 gap-2 mt-2">
+                  {predefinedIcons.map(icon => (
+                    <button
+                      key={icon}
+                      className={`p-2 text-xl border rounded hover:bg-gray-100 ${
+                        editingObject.customIcon === icon ? 'bg-blue-100 border-blue-500' : ''
+                      }`}
+                      onClick={() => setEditingObject({...editingObject, customIcon: icon})}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2">
+                  <label className="flex items-center space-x-2 p-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400">
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm">Загрузить свою иконку</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (e) => {
+                            setEditingObject({...editingObject, customIcon: e.target?.result as string});
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Выбор цвета */}
+              <div>
+                <Label>Цвет иконки</Label>
+                <div className="grid grid-cols-7 gap-2 mt-2">
+                  {predefinedColors.map(color => (
+                    <button
+                      key={color}
+                      className={`w-8 h-8 rounded border-2 ${
+                        editingObject.iconColor === color ? 'border-gray-800' : 'border-gray-300'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setEditingObject({...editingObject, iconColor: color})}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Фотографии */}
+              <div>
+                <Label>Фотографии</Label>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {editingObject.photos?.map((photo, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={photo}
+                        alt={`Фото ${index + 1}`}
+                        className="w-full h-20 object-cover rounded border"
+                      />
+                      <button
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs"
+                        onClick={() => {
+                          const newPhotos = editingObject.photos?.filter((_, i) => i !== index) || [];
+                          setEditingObject({...editingObject, photos: newPhotos});
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <label className="flex items-center justify-center w-full h-20 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-400">
+                    <Camera className="w-6 h-6 text-gray-400" />
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handlePhotoUpload(e, editingObject.id)}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex space-x-2 pt-4">
+                <AnimatedButton
+                  onClick={() => updateObject(editingObject)}
+                  className="flex-1"
+                >
+                  Сохранить
+                </AnimatedButton>
+                <AnimatedButton
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Отмена
+                </AnimatedButton>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
