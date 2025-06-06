@@ -4,8 +4,9 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Search, Navigation as NavigationIcon, MapPin, QrCode, Download, Filter, BarChart3, Clock, Route, Upload, Camera, Palette } from 'lucide-react';
+import { Search, Navigation as NavigationIcon, MapPin, QrCode, Download, Filter, BarChart3, Clock, Route, Upload, Camera, Palette, X } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { useIdleRedirect } from '../hooks/useIdleRedirect';
 import QRCode from 'qrcode';
 import { AnimatedButton } from './ui/animated-button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
@@ -25,6 +26,12 @@ interface MapObject {
   iconColor?: string;
 }
 
+interface RouteInfo {
+  distance: string;
+  duration: string;
+  qrCode: string;
+}
+
 const MapPage = () => {
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
   const [selectedObject, setSelectedObject] = useState<MapObject | null>(null);
@@ -37,14 +44,19 @@ const MapPage = () => {
   const [recentRoutes, setRecentRoutes] = useState([]);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  const [showRouteModal, setShowRouteModal] = useState(false);
   const mapRef = useRef<any>(null);
   const mapInstanceRef = useRef<any>(null);
   const currentLocationRef = useRef<any>(null);
   const routeRef = useRef<any>(null);
   const { toast } = useToast();
 
-  // Координаты постоянной точки "Вы здесь"
-  const currentLocation: [number, number] = [56.742252, 37.191930];
+  // Используем хук для автоматического редиректа
+  useIdleRedirect();
+
+  // Координаты киоска (новое местоположение по умолчанию)
+  const kioskLocation: [number, number] = [56.742292, 37.191953];
 
   const objectTypes = [
     { value: 'all', label: 'Все объекты', color: '#6366f1', icon: '🏢', count: 0 },
@@ -67,7 +79,6 @@ const MapPage = () => {
   ];
 
   useEffect(() => {
-    // Загрузка объектов карты
     const loadMapObjects = () => {
       try {
         const stored = localStorage.getItem('map_objects');
@@ -156,12 +167,11 @@ const MapPage = () => {
   }, []);
 
   useEffect(() => {
-    // Инициализация Яндекс.Карт с улучшенными всплывающими окнами
     const initializeMap = () => {
       if (window.ymaps && mapRef.current && !isMapLoaded) {
         window.ymaps.ready(() => {
           const map = new window.ymaps.Map(mapRef.current, {
-            center: currentLocation,
+            center: kioskLocation,
             zoom: 17,
             controls: ['zoomControl', 'fullscreenControl']
           });
@@ -169,25 +179,25 @@ const MapPage = () => {
           mapInstanceRef.current = map;
           setIsMapLoaded(true);
 
-          // Добавляем постоянную точку "Вы здесь"
-          const currentLocationPlacemark = new window.ymaps.Placemark(
-            currentLocation,
+          // Добавляем киоск "Вы здесь" со стрелкой
+          const kioskPlacemark = new window.ymaps.Placemark(
+            kioskLocation,
             {
               balloonContent: createBalloonContent({
-                name: '📍 Вы здесь',
-                description: 'Ваше текущее местоположение',
-                type: 'current'
+                name: '📍 Информационный киоск',
+                description: 'Вы находитесь здесь',
+                type: 'kiosk'
               }),
               hintContent: '📍 Вы здесь'
             },
             {
-              preset: 'islands#redHomeIcon',
+              preset: 'islands#redDirectionIcon',
               iconColor: '#e74c3c'
             }
           );
 
-          currentLocationRef.current = currentLocationPlacemark;
-          map.geoObjects.add(currentLocationPlacemark);
+          currentLocationRef.current = kioskPlacemark;
+          map.geoObjects.add(kioskPlacemark);
 
           // Добавление объектов на карту с улучшенными всплывающими окнами
           mapObjects.forEach(obj => {
@@ -208,6 +218,7 @@ const MapPage = () => {
 
             placemark.events.add('click', () => {
               setSelectedObject(obj);
+              map.balloon.close();
             });
 
             map.geoObjects.add(placemark);
@@ -237,36 +248,100 @@ const MapPage = () => {
           ${obj.floor ? `<div style="margin: 6px 0; padding: 4px 8px; background: #f3f4f6; border-radius: 6px; display: inline-block;"><strong>Этаж:</strong> ${obj.floor}</div>` : ''}
           ${obj.capacity ? `<div style="margin: 6px 0; padding: 4px 8px; background: #f3f4f6; border-radius: 6px; display: inline-block;"><strong>Вместимость:</strong> ${obj.capacity}</div>` : ''}
           ${obj.workingHours ? `<div style="margin: 6px 0; padding: 4px 8px; background: #f3f4f6; border-radius: 6px; display: inline-block;"><strong>Режим работы:</strong> ${obj.workingHours}</div>` : ''}
-          <div style="margin-top: 12px; display: flex; gap: 8px;">
-            <button onclick="window.setRouteFrom('${obj.id}')" style="flex: 1; background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Откуда</button>
-            <button onclick="window.setRouteTo('${obj.id}')" style="flex: 1; background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Куда</button>
-            <button onclick="window.editObject('${obj.id}')" style="background: #f59e0b; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">✏️</button>
-          </div>
+          ${obj.type !== 'kiosk' ? `<div style="margin-top: 12px;"><button onclick="window.buildRouteToObject('${obj.id}')" style="width: 100%; background: #3b82f6; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">🗺️ Маршрут</button></div>` : ''}
         </div>
       </div>
     `;
   };
 
-  // Глобальные функции для использования в всплывающих окнах
+  // Глобальная функция для построения маршрута из всплывающего окна
   useEffect(() => {
-    (window as any).setRouteFrom = (objId: string) => {
+    (window as any).buildRouteToObject = async (objId: string) => {
       const obj = mapObjects.find(o => o.id === objId);
-      if (obj) setRouteFrom(obj);
-    };
-    
-    (window as any).setRouteTo = (objId: string) => {
-      const obj = mapObjects.find(o => o.id === objId);
-      if (obj) setRouteTo(obj);
-    };
-
-    (window as any).editObject = (objId: string) => {
-      const obj = mapObjects.find(o => o.id === objId);
-      if (obj) {
-        setEditingObject(obj);
-        setIsEditDialogOpen(true);
+      if (obj && mapInstanceRef.current) {
+        // Закрываем всплывающее окно
+        mapInstanceRef.current.balloon.close();
+        
+        // Строим маршрут от киоска к объекту
+        await buildRouteFromKiosk(obj);
       }
     };
   }, [mapObjects]);
+
+  const buildRouteFromKiosk = async (targetObject: MapObject) => {
+    if (!mapInstanceRef.current) return;
+
+    // Удаляем предыдущий маршрут
+    if (routeRef.current) {
+      mapInstanceRef.current.geoObjects.remove(routeRef.current);
+    }
+
+    // Создаем новый маршрут с анимацией
+    const multiRoute = new window.ymaps.multiRouter.MultiRoute({
+      referencePoints: [kioskLocation, targetObject.coordinates],
+      params: {
+        routingMode: 'pedestrian'
+      }
+    }, {
+      boundsAutoApply: true,
+      routeActiveStrokeWidth: 8,
+      routeActiveStrokeColor: '#3b82f6',
+      routeStrokeWidth: 6,
+      routeStrokeColor: '#60a5fa',
+      wayPointStartIconColor: '#e74c3c',
+      wayPointFinishIconColor: '#10b981',
+      opacity: 0.9
+    });
+
+    routeRef.current = multiRoute;
+
+    // Добавляем маршрут с анимацией появления
+    multiRoute.events.add('requestsuccess', async () => {
+      const routes = multiRoute.getRoutes();
+      if (routes.get(0)) {
+        const route = routes.get(0);
+        const distance = route.properties.get('distance');
+        const duration = route.properties.get('duration');
+        
+        // Создаем информацию о маршруте
+        const routeData = {
+          distance: distance ? Math.round(distance.value / 1000 * 100) / 100 + ' км' : 'Неизвестно',
+          duration: duration ? Math.round(duration.value / 60) + ' мин' : 'Неизвестно',
+          qrCode: await generateRouteQR(kioskLocation, targetObject.coordinates)
+        };
+        
+        setRouteInfo(routeData);
+        setShowRouteModal(true);
+      }
+    });
+
+    mapInstanceRef.current.geoObjects.add(multiRoute);
+
+    toast({
+      title: "Маршрут построен",
+      description: `Путь к "${targetObject.name}"`
+    });
+  };
+
+  const generateRouteQR = async (from: [number, number], to: [number, number]) => {
+    try {
+      const mapsUrl = `https://yandex.ru/maps/?rtext=${from[0]},${from[1]}~${to[0]},${to[1]}&rtt=pd`;
+      
+      const qrCodeDataUrl = await QRCode.toDataURL(mapsUrl, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+      
+      return qrCodeDataUrl;
+    } catch (error) {
+      console.error('Ошибка генерации QR-кода:', error);
+      return '';
+    }
+  };
 
   const getPresetByType = (type: string) => {
     const presets = {
@@ -294,170 +369,29 @@ const MapPage = () => {
     return colors[type] || '#0066CC';
   };
 
-  const saveRecentRoute = (from: MapObject, to: MapObject) => {
-    const route = {
-      id: Date.now().toString(),
-      from: from.name,
-      to: to.name,
-      timestamp: new Date().toISOString(),
-      fromCoords: from.coordinates,
-      toCoords: to.coordinates
-    };
-    
-    const updatedRoutes = [route, ...recentRoutes.slice(0, 4)];
-    setRecentRoutes(updatedRoutes);
-    localStorage.setItem('recent_routes', JSON.stringify(updatedRoutes));
-  };
-
-  const generateRouteQR = async (from: MapObject, to: MapObject) => {
-    try {
-      const mapsUrl = `https://yandex.ru/maps/?rtext=${from.coordinates[0]},${from.coordinates[1]}~${to.coordinates[0]},${to.coordinates[1]}&rtt=pd`;
-      
-      const qrCodeDataUrl = await QRCode.toDataURL(mapsUrl, {
-        width: 200,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
-        }
-      });
-      
-      setRouteQRCode(qrCodeDataUrl);
-      
-      toast({
-        title: "QR-код создан",
-        description: "Отсканируйте QR-код чтобы открыть маршрут на смартфоне"
-      });
-    } catch (error) {
-      console.error('Ошибка генерации QR-кода:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось создать QR-код",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const buildRoute = async () => {
-    if (!routeFrom || !routeTo || !mapInstanceRef.current) {
-      toast({
-        title: "Ошибка построения маршрута",
-        description: "Выберите начальную и конечную точки",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Удаляем предыдущий маршрут
-    if (routeRef.current) {
-      mapInstanceRef.current.geoObjects.remove(routeRef.current);
-    }
-
-    // Создаем новый маршрут
-    const multiRoute = new window.ymaps.multiRouter.MultiRoute({
-      referencePoints: [routeFrom.coordinates, routeTo.coordinates],
-      params: {
-        routingMode: 'pedestrian'
-      }
-    }, {
-      boundsAutoApply: true,
-      routeActiveStrokeWidth: 6,
-      routeActiveStrokeColor: '#1e40af',
-      routeStrokeWidth: 4,
-      routeStrokeColor: '#3b82f6',
-      wayPointStartIconColor: '#10b981',
-      wayPointFinishIconColor: '#ef4444'
-    });
-
-    routeRef.current = multiRoute;
-    mapInstanceRef.current.geoObjects.add(multiRoute);
-
-    // Сохраняем в историю и генерируем QR-код
-    saveRecentRoute(routeFrom, routeTo);
-    await generateRouteQR(routeFrom, routeTo);
-
-    toast({
-      title: "Маршрут построен",
-      description: `От "${routeFrom.name}" до "${routeTo.name}"`
-    });
-  };
-
   const clearRoute = () => {
     if (routeRef.current && mapInstanceRef.current) {
       mapInstanceRef.current.geoObjects.remove(routeRef.current);
       routeRef.current = null;
     }
-    setRouteFrom(null);
-    setRouteTo(null);
-    setRouteQRCode(null);
+    setRouteInfo(null);
+    setShowRouteModal(false);
   };
 
   const downloadQRCode = () => {
-    if (routeQRCode) {
+    if (routeInfo?.qrCode) {
       const link = document.createElement('a');
       link.download = 'route-qr-code.png';
-      link.href = routeQRCode;
+      link.href = routeInfo.qrCode;
       link.click();
     }
   };
 
-  const loadRecentRoute = (route: { from: string, to: string }) => {
-    const fromObj = mapObjects.find(obj => obj.name === route.from);
-    const toObj = mapObjects.find(obj => obj.name === route.to);
-    
-    if (fromObj && toObj) {
-      setRouteFrom(fromObj);
-      setRouteTo(toObj);
-    }
-  };
-
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>, objId: string) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const readers = Array.from(files).map(file => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(file);
-        });
-      });
-
-      Promise.all(readers).then(results => {
-        const updatedObjects = mapObjects.map(obj => {
-          if (obj.id === objId) {
-            return {
-              ...obj,
-              photos: [...(obj.photos || []), ...results]
-            };
-          }
-          return obj;
-        });
-        setMapObjects(updatedObjects);
-        localStorage.setItem('map_objects', JSON.stringify(updatedObjects));
-        
-        toast({
-          title: "Фотографии добавлены",
-          description: `Добавлено ${results.length} фотографий`
-        });
-      });
-    }
-  };
-
-  const updateObject = (updatedObj: MapObject) => {
-    const updatedObjects = mapObjects.map(obj => 
-      obj.id === updatedObj.id ? updatedObj : obj
-    );
-    setMapObjects(updatedObjects);
-    localStorage.setItem('map_objects', JSON.stringify(updatedObjects));
-    setIsEditDialogOpen(false);
-    setEditingObject(null);
-    
-    // Перезагружаем карту для обновления иконок
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.geoObjects.removeAll();
-      setIsMapLoaded(false);
-    }
-  };
+  const filteredObjects = mapObjects.filter(obj =>
+    (activeFilter === 'all' || obj.type === activeFilter) &&
+    (obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+     obj.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   const getTypeStats = () => {
     const stats = { ...Object.fromEntries(objectTypes.map(t => [t.value, 0])) };
@@ -468,45 +402,39 @@ const MapPage = () => {
     return stats;
   };
 
-  const filteredObjects = mapObjects.filter(obj =>
-    (activeFilter === 'all' || obj.type === activeFilter) &&
-    (obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     obj.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
   const stats = getTypeStats();
 
   return (
-    <div className="p-4 lg:p-6 min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-        {/* Боковая панель */}
-        <div className="w-full lg:w-96 order-1 lg:order-1 space-y-4">
+    <div className="p-2 lg:p-4 min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
+        {/* Боковая панель - адаптирована для сенсорного управления */}
+        <div className="w-full lg:w-80 order-1 lg:order-1 space-y-3">
           {/* Поиск и фильтры */}
-          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-            <CardHeader className="pb-4">
+          <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center space-x-2 text-lg">
                 <Search className="w-5 h-5 text-blue-600" />
-                <span>Поиск и фильтры</span>
+                <span>Поиск объектов</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <Input
-                  placeholder="Поиск объектов..."
+                  placeholder="Найти объект..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 border-gray-200 focus:border-blue-400 transition-colors"
+                  className="pl-12 h-14 text-lg border-2 border-gray-200 focus:border-blue-400 transition-colors rounded-xl"
                 />
               </div>
               
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {objectTypes.map(type => (
                   <Badge
                     key={type.value}
                     variant={activeFilter === type.value ? "default" : "secondary"}
-                    className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
-                      activeFilter === type.value ? 'shadow-md' : 'hover:shadow-sm'
+                    className={`cursor-pointer transition-all duration-200 hover:scale-105 p-3 text-sm font-medium ${
+                      activeFilter === type.value ? 'shadow-lg' : 'hover:shadow-sm'
                     }`}
                     style={{
                       backgroundColor: activeFilter === type.value ? type.color : undefined,
@@ -514,196 +442,76 @@ const MapPage = () => {
                     }}
                     onClick={() => setActiveFilter(type.value)}
                   >
-                    <span className="mr-1">{type.icon}</span>
-                    {type.label} ({stats[type.value] || 0})
+                    <span className="mr-2 text-lg">{type.icon}</span>
+                    <div className="flex flex-col">
+                      <span>{type.label}</span>
+                      <span className="text-xs opacity-75">({stats[type.value] || 0})</span>
+                    </div>
                   </Badge>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Вкладки с функционалом */}
-          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-            <Tabs defaultValue="objects" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="objects" className="text-xs">Объекты</TabsTrigger>
-                <TabsTrigger value="routes" className="text-xs">Маршруты</TabsTrigger>
-                <TabsTrigger value="stats" className="text-xs">Статистика</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="objects" className="space-y-2 max-h-96 overflow-y-auto p-2">
-                {filteredObjects.map(obj => (
-                  <div
-                    key={obj.id}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-[1.02] ${
-                      selectedObject?.id === obj.id
-                        ? 'border-blue-500 bg-blue-50 shadow-md scale-[1.02]'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                    onClick={() => setSelectedObject(obj)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900 mb-1">{obj.name}</h4>
-                        <p className="text-sm text-gray-600 mb-2">{obj.description}</p>
-                        <div className="flex items-center space-x-2">
-                          <Badge 
-                            variant="outline" 
-                            style={{ borderColor: obj.iconColor || getColorByType(obj.type), color: obj.iconColor || getColorByType(obj.type) }}
-                            className="text-xs"
-                          >
-                            <span className="mr-1">{objectTypes.find(t => t.value === obj.type)?.icon}</span>
-                            {objectTypes.find(t => t.value === obj.type)?.label}
-                          </Badge>
-                          {obj.workingHours && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Clock className="w-3 h-3 mr-1" />
-                              {obj.workingHours}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2 mt-3">
-                      <AnimatedButton
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRouteFrom(obj);
-                        }}
-                        className="flex-1 text-xs"
-                      >
-                        Откуда
-                      </AnimatedButton>
-                      <AnimatedButton
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRouteTo(obj);
-                        }}
-                        className="flex-1 text-xs"
-                      >
-                        Куда
-                      </AnimatedButton>
-                      <AnimatedButton
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingObject(obj);
-                          setIsEditDialogOpen(true);
-                        }}
-                        className="text-xs"
-                      >
-                        ✏️
-                      </AnimatedButton>
-                    </div>
-                    
-                    {/* Быстрая загрузка фото */}
-                    <div className="mt-2">
-                      <label className="flex items-center justify-center space-x-2 p-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 transition-colors">
-                        <Camera className="w-4 h-4 text-gray-400" />
-                        <span className="text-xs text-gray-500">Добавить фото</span>
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handlePhotoUpload(e, obj.id)}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </TabsContent>
-
-              <TabsContent value="routes" className="space-y-4 p-2">
-                <div className="space-y-3">
-                  <div className="flex space-x-2">
+          {/* Список объектов - увеличенные элементы для сенсорного управления */}
+          <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Объекты предприятия</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+              {filteredObjects.map(obj => (
+                <div
+                  key={obj.id}
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:scale-[1.02] ${
+                    selectedObject?.id === obj.id
+                      ? 'border-blue-500 bg-blue-50 shadow-lg scale-[1.02]'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                  onClick={() => setSelectedObject(obj)}
+                >
+                  <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Откуда:</label>
-                      <div className="p-2 bg-gray-50 rounded border text-sm">
-                        {routeFrom ? routeFrom.name : 'Не выбрано'}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Куда:</label>
-                      <div className="p-2 bg-gray-50 rounded border text-sm">
-                        {routeTo ? routeTo.name : 'Не выбрано'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <AnimatedButton onClick={buildRoute} className="flex-1" disabled={!routeFrom || !routeTo}>
-                      <NavigationIcon className="w-4 h-4 mr-2" />
-                      Построить маршрут
-                    </AnimatedButton>
-                    <AnimatedButton onClick={clearRoute} variant="outline">
-                      Очистить
-                    </AnimatedButton>
-                  </div>
-
-                  {routeQRCode && (
-                    <div className="text-center space-y-3 p-4 bg-gray-50 rounded-lg">
-                      <img src={routeQRCode} alt="QR Code" className="mx-auto rounded" />
-                      <AnimatedButton onClick={downloadQRCode} size="sm" variant="outline">
-                        <Download className="w-4 h-4 mr-2" />
-                        Скачать QR-код
-                      </AnimatedButton>
-                    </div>
-                  )}
-
-                  {recentRoutes.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-gray-700 flex items-center">
-                        <Clock className="w-4 h-4 mr-2" />
-                        Недавние маршруты
-                      </h4>
-                      {recentRoutes.map(route => (
-                        <div 
-                          key={route.id}
-                          className="p-2 bg-white border rounded cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={() => loadRecentRoute(route)}
+                      <h4 className="font-semibold text-gray-900 mb-2 text-lg">{obj.name}</h4>
+                      <p className="text-gray-600 mb-3">{obj.description}</p>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Badge 
+                          variant="outline" 
+                          style={{ borderColor: obj.iconColor || getColorByType(obj.type), color: obj.iconColor || getColorByType(obj.type) }}
+                          className="text-sm"
                         >
-                          <div className="text-sm font-medium">{route.from} → {route.to}</div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(route.timestamp).toLocaleString('ru-RU')}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="stats" className="space-y-4 p-2">
-                <div className="space-y-3">
-                  <h4 className="font-medium text-gray-700 flex items-center">
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Статистика объектов
-                  </h4>
-                  {objectTypes.filter(t => t.value !== 'all').map(type => (
-                    <div key={type.value} className="flex items-center justify-between p-2 bg-white border rounded">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-lg">{type.icon}</span>
-                        <span className="text-sm">{type.label}</span>
+                          <span className="mr-1 text-lg">{objectTypes.find(t => t.value === obj.type)?.icon}</span>
+                          {objectTypes.find(t => t.value === obj.type)?.label}
+                        </Badge>
+                        {obj.workingHours && (
+                          <Badge variant="secondary" className="text-sm">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {obj.workingHours}
+                          </Badge>
+                        )}
                       </div>
-                      <Badge variant="secondary">{stats[type.value] || 0}</Badge>
                     </div>
-                  ))}
+                  </div>
+                  <AnimatedButton
+                    size="lg"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      buildRouteFromKiosk(obj);
+                    }}
+                    className="w-full h-14 text-lg font-semibold"
+                  >
+                    <Route className="w-5 h-5 mr-2" />
+                    Построить маршрут
+                  </AnimatedButton>
                 </div>
-              </TabsContent>
-            </Tabs>
+              ))}
+            </CardContent>
           </Card>
         </div>
 
         {/* Карта */}
         <div className="flex-1 order-2 lg:order-2">
-          <Card className="h-full shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="pb-4">
+          <Card className="h-full shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center space-x-2 text-xl">
                 <MapPin className="w-6 h-6 text-blue-600" />
                 <span>Интерактивная карта предприятия</span>
@@ -712,7 +520,7 @@ const MapPage = () => {
             <CardContent className="p-0">
               <div 
                 ref={mapRef} 
-                className="w-full h-[70vh] rounded-b-lg"
+                className="w-full h-[75vh] rounded-b-lg"
                 style={{ 
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   display: 'flex',
@@ -723,7 +531,7 @@ const MapPage = () => {
                 {!isMapLoaded && (
                   <div className="text-white text-center">
                     <div className="animate-spin w-8 h-8 border-4 border-white border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p>Загрузка карты...</p>
+                    <p className="text-lg">Загрузка карты...</p>
                   </div>
                 )}
               </div>
@@ -732,159 +540,48 @@ const MapPage = () => {
         </div>
       </div>
 
-      {/* Диалог редактирования объекта */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      {/* Модальное окно с информацией о маршруте */}
+      <Dialog open={showRouteModal} onOpenChange={setShowRouteModal}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Редактировать объект</DialogTitle>
+            <DialogTitle className="flex items-center space-x-2 text-xl">
+              <Route className="w-6 h-6 text-blue-600" />
+              <span>Информация о маршруте</span>
+            </DialogTitle>
           </DialogHeader>
-          {editingObject && (
-            <div className="space-y-4">
-              <div>
-                <Label>Название</Label>
-                <Input
-                  value={editingObject.name}
-                  onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
-                />
+          {routeInfo && (
+            <div className="space-y-6 text-center">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{routeInfo.distance}</div>
+                  <div className="text-sm text-gray-600">Расстояние</div>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{routeInfo.duration}</div>
+                  <div className="text-sm text-gray-600">Время пути</div>
+                </div>
               </div>
               
-              <div>
-                <Label>Описание</Label>
-                <Input
-                  value={editingObject.description}
-                  onChange={(e) => setEditingObject({...editingObject, description: e.target.value})}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Этаж</Label>
-                  <Input
-                    value={editingObject.floor || ''}
-                    onChange={(e) => setEditingObject({...editingObject, floor: e.target.value})}
-                  />
+              {routeInfo.qrCode && (
+                <div className="space-y-3">
+                  <p className="text-gray-700">Отсканируйте QR-код для открытия маршрута на смартфоне:</p>
+                  <div className="flex justify-center">
+                    <img src={routeInfo.qrCode} alt="QR Code" className="rounded-lg shadow-md" />
+                  </div>
+                  <AnimatedButton onClick={downloadQRCode} variant="outline" className="w-full">
+                    <Download className="w-4 h-4 mr-2" />
+                    Скачать QR-код
+                  </AnimatedButton>
                 </div>
-                <div>
-                  <Label>Вместимость</Label>
-                  <Input
-                    value={editingObject.capacity || ''}
-                    onChange={(e) => setEditingObject({...editingObject, capacity: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Режим работы</Label>
-                <Input
-                  value={editingObject.workingHours || ''}
-                  onChange={(e) => setEditingObject({...editingObject, workingHours: e.target.value})}
-                />
-              </div>
-
-              {/* Выбор иконки */}
-              <div>
-                <Label>Иконка</Label>
-                <div className="grid grid-cols-8 gap-2 mt-2">
-                  {predefinedIcons.map(icon => (
-                    <button
-                      key={icon}
-                      className={`p-2 text-xl border rounded hover:bg-gray-100 ${
-                        editingObject.customIcon === icon ? 'bg-blue-100 border-blue-500' : ''
-                      }`}
-                      onClick={() => setEditingObject({...editingObject, customIcon: icon})}
-                    >
-                      {icon}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2">
-                  <label className="flex items-center space-x-2 p-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400">
-                    <Upload className="w-4 h-4" />
-                    <span className="text-sm">Загрузить свою иконку</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (e) => {
-                            setEditingObject({...editingObject, customIcon: e.target?.result as string});
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Выбор цвета */}
-              <div>
-                <Label>Цвет иконки</Label>
-                <div className="grid grid-cols-7 gap-2 mt-2">
-                  {predefinedColors.map(color => (
-                    <button
-                      key={color}
-                      className={`w-8 h-8 rounded border-2 ${
-                        editingObject.iconColor === color ? 'border-gray-800' : 'border-gray-300'
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setEditingObject({...editingObject, iconColor: color})}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Фотографии */}
-              <div>
-                <Label>Фотографии</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {editingObject.photos?.map((photo, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={photo}
-                        alt={`Фото ${index + 1}`}
-                        className="w-full h-20 object-cover rounded border"
-                      />
-                      <button
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs"
-                        onClick={() => {
-                          const newPhotos = editingObject.photos?.filter((_, i) => i !== index) || [];
-                          setEditingObject({...editingObject, photos: newPhotos});
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <label className="flex items-center justify-center w-full h-20 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-400">
-                    <Camera className="w-6 h-6 text-gray-400" />
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handlePhotoUpload(e, editingObject.id)}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex space-x-2 pt-4">
-                <AnimatedButton
-                  onClick={() => updateObject(editingObject)}
-                  className="flex-1"
-                >
-                  Сохранить
+              )}
+              
+              <div className="flex space-x-3">
+                <AnimatedButton onClick={clearRoute} variant="outline" className="flex-1">
+                  <X className="w-4 h-4 mr-2" />
+                  Закрыть маршрут
                 </AnimatedButton>
-                <AnimatedButton
-                  variant="outline"
-                  onClick={() => setIsEditDialogOpen(false)}
-                  className="flex-1"
-                >
-                  Отмена
+                <AnimatedButton onClick={() => setShowRouteModal(false)} className="flex-1">
+                  Понятно
                 </AnimatedButton>
               </div>
             </div>
