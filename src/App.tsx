@@ -10,6 +10,7 @@ import NewsPage from "./components/NewsPage";
 import GalleryPage from "./components/GalleryPage";
 import SearchPage from "./components/SearchPage";
 import AboutPage from "./components/AboutPage";
+import CompanySettings from "./components/CompanySettings";
 import AdminPanel from "./components/admin/AdminPanel";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="gallery" element={<GalleryPage />} />
             <Route path="search" element={<SearchPage />} />
             <Route path="about" element={<AboutPage />} />
+            <Route path="settings" element={<CompanySettings />} />
           </Route>
           <Route path="/admin/*" element={<AdminPanel />} />
           <Route path="*" element={<NotFound />} />

@@ -1,294 +1,238 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Input } from './ui/input';
-import { Button } from './ui/button';
-import { Search, MapPin, Calendar, Image as ImageIcon, Filter } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Search, ArrowLeft, MapPin, FileText, Image as ImageIcon, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { AnimatedButton } from './ui/animated-button';
+import { Input } from './ui/input';
+import { useIdleRedirect } from '../hooks/useIdleRedirect';
 
-interface SearchableItem {
+interface SearchResult {
   id: string;
   title: string;
   description: string;
-  type: 'object' | 'news' | 'gallery';
-  category?: string;
+  type: 'map' | 'news' | 'gallery' | 'about';
+  url: string;
   date?: string;
-  url?: string;
-  coordinates?: [number, number];
-  letter?: string;
+  category?: string;
 }
 
 const SearchPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchableItem[]>([]);
-  const [allItems, setAllItems] = useState<SearchableItem[]>([]);
-  const [selectedLetter, setSelectedLetter] = useState<string>('');
-  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const alphabet = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'.split('');
+  // Автоматический редирект при бездействии
+  useIdleRedirect();
 
-  useEffect(() => {
-    loadAllItems();
-  }, []);
-
-  useEffect(() => {
-    performSearch();
-  }, [searchQuery, selectedLetter, activeFilter, allItems]);
-
-  const loadAllItems = () => {
-    try {
-      const items: SearchableItem[] = [];
-
-      // Загрузка объектов карты
-      const mapObjects = JSON.parse(localStorage.getItem('map_objects') || '[]');
-      mapObjects.forEach((obj: any) => {
-        items.push({
-          id: `map_${obj.id}`,
-          title: obj.name,
-          description: obj.description,
-          type: 'object',
-          category: obj.type,
-          coordinates: obj.coordinates,
-          letter: obj.name.charAt(0).toUpperCase()
-        });
-      });
-
-      // Загрузка новостей
-      const news = JSON.parse(localStorage.getItem('enterprise_news') || '[]');
-      news.forEach((item: any) => {
-        items.push({
-          id: `news_${item.id}`,
-          title: item.title,
-          description: item.description,
-          type: 'news',
-          date: item.date,
-          letter: item.title.charAt(0).toUpperCase()
-        });
-      });
-
-      // Загрузка галереи
-      const gallery = JSON.parse(localStorage.getItem('enterprise_gallery') || '[]');
-      gallery.forEach((item: any) => {
-        items.push({
-          id: `gallery_${item.id}`,
-          title: item.title,
-          description: item.description,
-          type: 'gallery',
-          category: item.category,
-          date: item.date,
-          url: item.url,
-          letter: item.title.charAt(0).toUpperCase()
-        });
-      });
-
-      setAllItems(items);
-    } catch (error) {
-      console.log('Ошибка загрузки данных для поиска:', error);
+  // Демо данные для поиска
+  const allContent: SearchResult[] = [
+    {
+      id: '1',
+      title: 'Главное здание',
+      description: 'Административное здание предприятия с офисами управления',
+      type: 'map',
+      url: '/map',
+      category: 'Объекты карты'
+    },
+    {
+      id: '2',
+      title: 'Производственный цех №1',
+      description: 'Основное производство, сборочные линии',
+      type: 'map',
+      url: '/map',
+      category: 'Объекты карты'
+    },
+    {
+      id: '3',
+      title: 'Открытие нового производственного цеха',
+      description: 'С радостью сообщаем об открытии современного производственного цеха №3',
+      type: 'news',
+      url: '/news',
+      date: new Date().toISOString(),
+      category: 'Новости'
+    },
+    {
+      id: '4',
+      title: 'О предприятии',
+      description: 'История, структура и достижения нашего предприятия',
+      type: 'about',
+      url: '/about',
+      category: 'Информация'
+    },
+    {
+      id: '5',
+      title: 'Галерея фотографий',
+      description: 'Фото и видео материалы предприятия',
+      type: 'gallery',
+      url: '/gallery',
+      category: 'Медиа'
     }
-  };
+  ];
 
-  const performSearch = () => {
-    let filtered = [...allItems];
-
-    // Фильтр по типу
-    if (activeFilter !== 'all') {
-      filtered = filtered.filter(item => item.type === activeFilter);
+  const performSearch = (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
     }
 
-    // Фильтр по букве
-    if (selectedLetter) {
-      filtered = filtered.filter(item => item.letter === selectedLetter);
-    }
-
-    // Поиск по тексту
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.title.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query) ||
-        item.category?.toLowerCase().includes(query)
+    setIsSearching(true);
+    
+    // Имитация задержки поиска
+    setTimeout(() => {
+      const results = allContent.filter(item =>
+        item.title.toLowerCase().includes(query.toLowerCase()) ||
+        item.description.toLowerCase().includes(query.toLowerCase()) ||
+        item.category?.toLowerCase().includes(query.toLowerCase())
       );
-    }
-
-    setSearchResults(filtered);
+      
+      setSearchResults(results);
+      setIsSearching(false);
+    }, 300);
   };
+
+  useEffect(() => {
+    performSearch(searchQuery);
+  }, [searchQuery]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'object':
-        return <MapPin className="w-5 h-5 text-blue-600" />;
-      case 'news':
-        return <Calendar className="w-5 h-5 text-green-600" />;
-      case 'gallery':
-        return <ImageIcon className="w-5 h-5 text-purple-600" />;
-      default:
-        return <Search className="w-5 h-5 text-gray-600" />;
+      case 'map': return MapPin;
+      case 'news': return Calendar;
+      case 'gallery': return ImageIcon;
+      case 'about': return FileText;
+      default: return FileText;
     }
   };
 
-  const getTypeLabel = (type: string) => {
+  const getTypeColor = (type: string) => {
     switch (type) {
-      case 'object':
-        return 'Объект';
-      case 'news':
-        return 'Новость';
-      case 'gallery':
-        return 'Галерея';
-      default:
-        return 'Неизвестно';
+      case 'map': return 'bg-blue-100 text-blue-800';
+      case 'news': return 'bg-green-100 text-green-800';
+      case 'gallery': return 'bg-purple-100 text-purple-800';
+      case 'about': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const SearchResultCard = ({ item }: { item: SearchableItem }) => (
-    <Card className="hover:shadow-lg transition-shadow duration-300">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <CardTitle className="text-lg line-clamp-2 flex-1">{item.title}</CardTitle>
-          <div className="ml-4 flex items-center space-x-2">
-            {getTypeIcon(item.type)}
-            <span className="text-sm text-gray-500">{getTypeLabel(item.type)}</span>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-gray-600 mb-4 line-clamp-3">{item.description}</p>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4 text-sm text-gray-500">
-            {item.date && (
-              <span>{new Date(item.date).toLocaleDateString('ru-RU')}</span>
-            )}
-            {item.category && (
-              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">
-                {item.category}
-              </span>
-            )}
-          </div>
-          
-          <div className="flex space-x-2">
-            {item.type === 'object' && (
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/map">Показать на карте</Link>
-              </Button>
-            )}
-            {item.type === 'news' && (
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/news">Читать новости</Link>
-              </Button>
-            )}
-            {item.type === 'gallery' && (
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/gallery">Открыть галерею</Link>
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Поиск</h1>
-        
-        {/* Строка поиска */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Поиск по всему содержимому..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 lg:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Заголовок */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link to="/">
+              <AnimatedButton variant="outline" size="lg">
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                На главную
+              </AnimatedButton>
+            </Link>
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-800">Поиск</h1>
+              <p className="text-gray-600 text-lg">Найдите нужную информацию</p>
+            </div>
           </div>
-          {searchQuery && (
-            <Button
-              variant="outline"
-              onClick={() => setSearchQuery('')}
-            >
-              Очистить
-            </Button>
+        </div>
+
+        {/* Поисковая строка */}
+        <Card className="shadow-lg">
+          <CardContent className="p-6">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-6 h-6" />
+              <Input
+                placeholder="Введите поисковый запрос..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-14 h-16 text-xl border-2 border-gray-200 focus:border-blue-400 transition-colors rounded-xl"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Результаты поиска */}
+        <div className="space-y-4">
+          {isSearching ? (
+            <Card className="shadow-lg">
+              <CardContent className="p-12 text-center">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-600">Поиск...</p>
+              </CardContent>
+            </Card>
+          ) : searchQuery && searchResults.length === 0 ? (
+            <Card className="shadow-lg">
+              <CardContent className="p-12 text-center">
+                <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">Ничего не найдено</h3>
+                <p className="text-gray-500">Попробуйте изменить поисковый запрос</p>
+              </CardContent>
+            </Card>
+          ) : searchResults.length > 0 ? (
+            <>
+              <div className="text-gray-600 text-lg">
+                Найдено результатов: <span className="font-semibold">{searchResults.length}</span>
+              </div>
+              {searchResults.map(result => {
+                const IconComponent = getTypeIcon(result.type);
+                return (
+                  <Link key={result.id} to={result.url}>
+                    <Card className="shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
+                      <CardContent className="p-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="flex-shrink-0">
+                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                              <IconComponent className="w-6 h-6 text-blue-600" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h3 className="text-xl font-semibold text-gray-800 group-hover:text-blue-600 transition-colors mb-2">
+                                  {result.title}
+                                </h3>
+                                <p className="text-gray-600 text-lg leading-relaxed mb-3">
+                                  {result.description}
+                                </p>
+                                <div className="flex items-center space-x-3">
+                                  <Badge className={getTypeColor(result.type)}>
+                                    {result.category}
+                                  </Badge>
+                                  {result.date && (
+                                    <span className="text-sm text-gray-500">
+                                      {formatDate(result.date)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </>
+          ) : (
+            <Card className="shadow-lg">
+              <CardContent className="p-12 text-center">
+                <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">Введите поисковый запрос</h3>
+                <p className="text-gray-500">Начните ввод для поиска по всем разделам</p>
+              </CardContent>
+            </Card>
           )}
         </div>
-
-        {/* Алфавитный указатель */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Поиск по алфавиту</h3>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={selectedLetter === '' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedLetter('')}
-            >
-              Все
-            </Button>
-            {alphabet.map((letter) => (
-              <Button
-                key={letter}
-                variant={selectedLetter === letter ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedLetter(letter)}
-                className="w-10 h-10 p-0"
-              >
-                {letter}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Фильтры */}
-        <Tabs value={activeFilter} onValueChange={setActiveFilter}>
-          <TabsList className="grid w-full max-w-md grid-cols-4">
-            <TabsTrigger value="all">Все</TabsTrigger>
-            <TabsTrigger value="object">Объекты</TabsTrigger>
-            <TabsTrigger value="news">Новости</TabsTrigger>
-            <TabsTrigger value="gallery">Галерея</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value={activeFilter} className="mt-6">
-            {/* Результаты поиска */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">
-                  Результаты поиска ({searchResults.length})
-                </h3>
-                {(searchQuery || selectedLetter || activeFilter !== 'all') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSelectedLetter('');
-                      setActiveFilter('all');
-                    }}
-                  >
-                    <Filter className="w-4 h-4 mr-2" />
-                    Сбросить фильтры
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {searchResults.map((item) => (
-                <SearchResultCard key={item.id} item={item} />
-              ))}
-            </div>
-
-            {searchResults.length === 0 && (
-              <div className="text-center py-12">
-                <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg mb-2">Ничего не найдено</p>
-                <p className="text-gray-400">
-                  Попробуйте изменить поисковый запрос или фильтры
-                </p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );

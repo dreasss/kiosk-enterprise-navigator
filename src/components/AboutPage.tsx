@@ -1,254 +1,230 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Building, Users, Calendar, Award, Target, MapPin } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Building2, ArrowLeft, Users, Award, Target, History } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AnimatedButton } from './ui/animated-button';
+import { useIdleRedirect } from '../hooks/useIdleRedirect';
 
 interface CompanyInfo {
   name: string;
+  logo: string;
   description: string;
   founded: string;
-  employees: string;
-  address: string;
+  employees: number;
+  achievements: string[];
   mission: string;
-  vision: string;
   values: string[];
-  achievements: Array<{
-    year: string;
-    title: string;
+  departments: Array<{
+    name: string;
     description: string;
+    head: string;
+    employees: number;
   }>;
-  contacts: {
-    phone: string;
-    email: string;
-    website: string;
-  };
 }
 
 const AboutPage = () => {
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
-    name: '',
-    description: '',
-    founded: '',
-    employees: '',
-    address: '',
-    mission: '',
-    vision: '',
-    values: [],
-    achievements: [],
-    contacts: {
-      phone: '',
-      email: '',
-      website: ''
-    }
-  });
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+
+  // Автоматический редирект при бездействии
+  useIdleRedirect();
 
   useEffect(() => {
-    loadCompanyInfo();
-  }, []);
-
-  const loadCompanyInfo = () => {
-    try {
+    // Загрузка информации о компании из localStorage или демо данные
+    const loadCompanyInfo = () => {
       const stored = localStorage.getItem('company_info');
       if (stored) {
         setCompanyInfo(JSON.parse(stored));
       } else {
-        // Демо данные
         const demoInfo: CompanyInfo = {
-          name: 'ООО "Современное Предприятие"',
-          description: 'Ведущее предприятие в области высокотехнологичного производства с многолетней историей успешной работы на российском и международном рынках.',
+          name: 'ООО "Инновационные Технологии"',
+          logo: '🏭',
+          description: 'Ведущее предприятие в области производства высокотехнологичного оборудования и инновационных решений для промышленности.',
           founded: '1995',
-          employees: '1200+',
-          address: 'г. Москва, ул. Промышленная, д. 15',
-          mission: 'Предоставление высококачественной продукции и услуг, способствующих развитию промышленности и улучшению качества жизни людей.',
-          vision: 'Стать лидером в области инновационных технологий и устойчивого развития, обеспечивая долгосрочную ценность для всех заинтересованных сторон.',
-          values: [
-            'Качество и надежность',
-            'Инновации и развитие',
-            'Ответственность перед обществом',
-            'Уважение к сотрудникам',
-            'Экологическая безопасность'
-          ],
+          employees: 450,
           achievements: [
-            {
-              year: '2023',
-              title: 'Сертификация ISO 14001',
-              description: 'Получение международного сертификата системы экологического менеджмента'
-            },
-            {
-              year: '2022',
-              title: 'Премия "Лучшее предприятие года"',
-              description: 'Награда от Министерства промышленности за выдающиеся достижения'
-            },
-            {
-              year: '2021',
-              title: 'Внедрение Industry 4.0',
-              description: 'Успешная цифровизация производственных процессов'
-            },
-            {
-              year: '2020',
-              title: '25 лет на рынке',
-              description: 'Юбилей компании и достижение значимых показателей'
-            }
+            'Лауреат премии "Лучшее предприятие года" 2023',
+            'Сертификат качества ISO 9001:2015',
+            'Более 100 патентов на изобретения',
+            'Экспорт в 15 стран мира'
           ],
-          contacts: {
-            phone: '+7 (495) 123-45-67',
-            email: 'info@enterprise.ru',
-            website: 'www.enterprise.ru'
-          }
+          mission: 'Создание инновационных технологических решений, которые делают промышленность более эффективной и экологичной.',
+          values: [
+            'Инновации и развитие',
+            'Качество и надежность',
+            'Экологическая ответственность',
+            'Командная работа',
+            'Клиентоориентированность'
+          ],
+          departments: [
+            {
+              name: 'Отдел разработки',
+              description: 'Создание новых технологий и продуктов',
+              head: 'Иванов А.П.',
+              employees: 45
+            },
+            {
+              name: 'Производственный отдел',
+              description: 'Изготовление высококачественной продукции',
+              head: 'Петров В.С.',
+              employees: 180
+            },
+            {
+              name: 'Отдел качества',
+              description: 'Контроль качества на всех этапах производства',
+              head: 'Сидорова М.И.',
+              employees: 25
+            },
+            {
+              name: 'Отдел продаж',
+              description: 'Работа с клиентами и развитие рынков сбыта',
+              head: 'Козлов Д.А.',
+              employees: 30
+            }
+          ]
         };
         setCompanyInfo(demoInfo);
         localStorage.setItem('company_info', JSON.stringify(demoInfo));
       }
-    } catch (error) {
-      console.log('Ошибка загрузки информации о предприятии:', error);
-    }
-  };
+    };
+
+    loadCompanyInfo();
+  }, []);
+
+  if (!companyInfo) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">О предприятии</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 lg:p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Заголовок */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link to="/">
+              <AnimatedButton variant="outline" size="lg">
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                На главную
+              </AnimatedButton>
+            </Link>
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-800">О предприятии</h1>
+              <p className="text-gray-600 text-lg">История, структура и достижения</p>
+            </div>
+          </div>
+        </div>
 
         {/* Основная информация */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <Card className="lg:col-span-2">
+        <Card className="shadow-xl">
+          <CardHeader className="text-center pb-6">
+            <div className="text-6xl mb-4">{companyInfo.logo}</div>
+            <CardTitle className="text-3xl text-gray-800 mb-2">
+              {companyInfo.name}
+            </CardTitle>
+            <p className="text-xl text-gray-600 leading-relaxed max-w-4xl mx-auto">
+              {companyInfo.description}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-blue-600">{companyInfo.founded}</div>
+                <div className="text-gray-600">Год основания</div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-green-600">{companyInfo.employees}</div>
+                <div className="text-gray-600">Сотрудников</div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-3xl font-bold text-purple-600">15+</div>
+                <div className="text-gray-600">Стран экспорта</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Миссия */}
+          <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Building className="w-6 h-6 text-blue-600" />
-                <span>{companyInfo.name}</span>
+              <CardTitle className="flex items-center text-xl">
+                <Target className="w-6 h-6 mr-2 text-blue-600" />
+                Наша миссия
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-gray-700 text-lg leading-relaxed">
-                {companyInfo.description}
+                {companyInfo.mission}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Ценности */}
+          <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Ключевые факты</CardTitle>
+              <CardTitle className="flex items-center text-xl">
+                <Award className="w-6 h-6 mr-2 text-green-600" />
+                Наши ценности
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Calendar className="w-5 h-5 text-green-600" />
-                <div>
-                  <div className="font-medium">Основано</div>
-                  <div className="text-gray-600">{companyInfo.founded} год</div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Users className="w-5 h-5 text-blue-600" />
-                <div>
-                  <div className="font-medium">Сотрудников</div>
-                  <div className="text-gray-600">{companyInfo.employees}</div>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <MapPin className="w-5 h-5 text-red-600 mt-1" />
-                <div>
-                  <div className="font-medium">Адрес</div>
-                  <div className="text-gray-600">{companyInfo.address}</div>
-                </div>
+            <CardContent>
+              <div className="space-y-3">
+                {companyInfo.values.map((value, index) => (
+                  <div key={index} className="flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
+                    <span className="text-gray-700">{value}</span>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Миссия и видение */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Target className="w-5 h-5 text-green-600" />
-                <span>Миссия</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700">{companyInfo.mission}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Award className="w-5 h-5 text-purple-600" />
-                <span>Видение</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700">{companyInfo.vision}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Ценности */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Наши ценности</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {companyInfo.values.map((value, index) => (
-                <div 
-                  key={index}
-                  className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-600"
-                >
-                  <div className="font-medium text-gray-800">{value}</div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Достижения */}
-        <Card className="mb-8">
+        <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Award className="w-5 h-5 text-gold-600" />
-              <span>Достижения и награды</span>
+            <CardTitle className="flex items-center text-xl">
+              <History className="w-6 h-6 mr-2 text-purple-600" />
+              Наши достижения
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {companyInfo.achievements.map((achievement, index) => (
-                <div key={index} className="flex items-start space-x-4 p-4 border-l-4 border-blue-600 bg-blue-50 rounded-r-lg">
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
-                      {achievement.year.slice(-2)}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg text-gray-800 mb-1">
-                      {achievement.title}
-                    </h3>
-                    <p className="text-gray-600">{achievement.description}</p>
-                  </div>
+                <div key={index} className="flex items-start space-x-3 p-4 bg-purple-50 rounded-lg">
+                  <Award className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
+                  <span className="text-gray-700">{achievement}</span>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Контакты */}
-        <Card>
+        {/* Структура предприятия */}
+        <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Контактная информация</CardTitle>
+            <CardTitle className="flex items-center text-xl">
+              <Users className="w-6 h-6 mr-2 text-orange-600" />
+              Структура предприятия
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="font-medium text-gray-800 mb-2">Телефон</div>
-                <div className="text-blue-600 font-mono">{companyInfo.contacts.phone}</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="font-medium text-gray-800 mb-2">Email</div>
-                <div className="text-blue-600">{companyInfo.contacts.email}</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="font-medium text-gray-800 mb-2">Веб-сайт</div>
-                <div className="text-blue-600">{companyInfo.contacts.website}</div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {companyInfo.departments.map((dept, index) => (
+                <div key={index} className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">{dept.name}</h3>
+                  <p className="text-gray-600 mb-4">{dept.description}</p>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Руководитель: {dept.head}</span>
+                    <Badge variant="secondary">{dept.employees} чел.</Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

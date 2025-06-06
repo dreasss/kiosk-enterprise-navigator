@@ -1,207 +1,187 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Search, Calendar, ExternalLink } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Badge } from './ui/badge';
+import { Calendar, Clock, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AnimatedButton } from './ui/animated-button';
+import { useIdleRedirect } from '../hooks/useIdleRedirect';
 
 interface NewsItem {
   id: string;
   title: string;
-  description: string;
   content: string;
   date: string;
-  author?: string;
-  source?: string;
-  isExternal?: boolean;
-  url?: string;
+  category: string;
+  priority: 'low' | 'medium' | 'high';
+  image?: string;
 }
 
 const NewsPage = () => {
-  const [internalNews, setInternalNews] = useState<NewsItem[]>([]);
-  const [externalNews, setExternalNews] = useState<NewsItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('internal');
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Автоматический редирект при бездействии
+  useIdleRedirect();
 
   useEffect(() => {
-    loadNews();
-  }, []);
-
-  const loadNews = () => {
-    try {
-      // Загрузка внутренних новостей
+    // Загрузка новостей из localStorage или демо данные
+    const loadNews = () => {
       const stored = localStorage.getItem('enterprise_news');
       if (stored) {
-        setInternalNews(JSON.parse(stored));
+        setNews(JSON.parse(stored));
       } else {
-        // Демо данные
         const demoNews: NewsItem[] = [
           {
             id: '1',
-            title: 'Запуск нового производственного цеха',
-            description: 'На предприятии открылся современный производственный цех с новейшим оборудованием',
-            content: 'Сегодня состоялось торжественное открытие нового производственного цеха. Цех оснащен современным автоматизированным оборудованием, что позволит увеличить производительность на 30% и улучшить качество продукции.',
+            title: 'Открытие нового производственного цеха',
+            content: 'С радостью сообщаем об открытии современного производственного цеха №3. Новое оборудование позволит увеличить производительность на 30%.',
             date: new Date().toISOString(),
-            author: 'Администрация предприятия'
+            category: 'production',
+            priority: 'high'
           },
           {
             id: '2',
             title: 'Обновление системы безопасности',
-            description: 'Внедрена новая система контроля доступа и видеонаблюдения',
-            content: 'В рамках модернизации инфраструктуры предприятия была установлена современная система безопасности. Новая система включает биометрические сканеры, камеры высокого разрешения и интеллектуальную систему анализа.',
-            date: new Date(Date.now() - 86400000).toISOString(),
-            author: 'Служба безопасности'
+            content: 'Завершена модернизация системы контроля доступа. Все сотрудники получат новые пропуски в течение недели.',
+            date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            category: 'security',
+            priority: 'medium'
           },
           {
             id: '3',
-            title: 'Экологическая инициатива',
-            description: 'Предприятие присоединилось к программе "Зеленое производство"',
-            content: 'Наше предприятие стало участником федеральной программы "Зеленое производство". В рамках программы планируется внедрение энергосберегающих технологий и системы переработки отходов.',
-            date: new Date(Date.now() - 172800000).toISOString(),
-            author: 'Экологический отдел'
+            title: 'График работы на праздничные дни',
+            content: 'Уважаемые сотрудники! Обращаем внимание на изменения в графике работы в период праздничных дней.',
+            date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+            category: 'general',
+            priority: 'low'
           }
         ];
-        setInternalNews(demoNews);
+        setNews(demoNews);
         localStorage.setItem('enterprise_news', JSON.stringify(demoNews));
       }
+    };
 
-      // Загрузка внешних новостей (RSS)
-      const rssNews = JSON.parse(localStorage.getItem('rss_news') || '[]');
-      setExternalNews(rssNews);
-      
-      // Симуляция загрузки RSS если нет данных
-      if (rssNews.length === 0) {
-        const demoRssNews: NewsItem[] = [
-          {
-            id: 'rss1',
-            title: 'Новые технологии в промышленности',
-            description: 'Обзор последних технологических решений для промышленных предприятий',
-            content: 'Краткое описание новостей из внешних источников...',
-            date: new Date().toISOString(),
-            source: 'Промышленный вестник',
-            isExternal: true,
-            url: 'https://example.com/news1'
-          },
-          {
-            id: 'rss2',
-            title: 'Изменения в отраслевом законодательстве',
-            description: 'Важные изменения в нормативно-правовой базе',
-            content: 'Краткое описание новостей из внешних источников...',
-            date: new Date(Date.now() - 43200000).toISOString(),
-            source: 'Правовой навигатор',
-            isExternal: true,
-            url: 'https://example.com/news2'
-          }
-        ];
-        setExternalNews(demoRssNews);
-        localStorage.setItem('rss_news', JSON.stringify(demoRssNews));
-      }
-    } catch (error) {
-      console.log('Ошибка загрузки новостей:', error);
+    loadNews();
+  }, []);
+
+  const categories = [
+    { value: 'all', label: 'Все новости', color: 'bg-blue-500' },
+    { value: 'production', label: 'Производство', color: 'bg-green-500' },
+    { value: 'security', label: 'Безопасность', color: 'bg-red-500' },
+    { value: 'general', label: 'Общие', color: 'bg-gray-500' }
+  ];
+
+  const filteredNews = selectedCategory === 'all' 
+    ? news 
+    : news.filter(item => item.category === selectedCategory);
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const filterNews = (news: NewsItem[]) => {
-    if (!searchQuery) return news;
-    return news.filter(item =>
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const NewsCard = ({ news }: { news: NewsItem }) => (
-    <Card className="hover:shadow-lg transition-shadow duration-300">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <CardTitle className="text-lg line-clamp-2 flex-1">{news.title}</CardTitle>
-          {news.isExternal && (
-            <ExternalLink className="w-4 h-4 text-blue-600 ml-2 flex-shrink-0" />
-          )}
-        </div>
-        <div className="flex items-center space-x-4 text-sm text-gray-500">
-          <span className="flex items-center space-x-1">
-            <Calendar className="w-4 h-4" />
-            <span>{new Date(news.date).toLocaleDateString('ru-RU')}</span>
-          </span>
-          {news.author && (
-            <span>Автор: {news.author}</span>
-          )}
-          {news.source && (
-            <span>Источник: {news.source}</span>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-gray-600 mb-4 line-clamp-3">{news.description}</p>
-        {news.content !== news.description && (
-          <p className="text-gray-700 mb-4 line-clamp-4">{news.content}</p>
-        )}
-        {news.isExternal && news.url && (
-          <Button variant="outline" size="sm" asChild>
-            <a href={news.url} target="_blank" rel="noopener noreferrer">
-              Читать полностью
-            </a>
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Новости</h1>
-        
-        {/* Поиск */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Поиск новостей..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 lg:p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Заголовок */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link to="/">
+              <AnimatedButton variant="outline" size="lg">
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                На главную
+              </AnimatedButton>
+            </Link>
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-800">Новости и события</h1>
+              <p className="text-gray-600 text-lg">Актуальная информация предприятия</p>
+            </div>
           </div>
         </div>
 
-        {/* Вкладки */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="internal">Новости предприятия</TabsTrigger>
-            <TabsTrigger value="external">Отраслевые новости</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="internal" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filterNews(internalNews).map((news) => (
-                <NewsCard key={news.id} news={news} />
+        {/* Фильтры */}
+        <Card className="shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex flex-wrap gap-3">
+              {categories.map(category => (
+                <AnimatedButton
+                  key={category.value}
+                  variant={selectedCategory === category.value ? "default" : "outline"}
+                  onClick={() => setSelectedCategory(category.value)}
+                  className="text-lg h-12"
+                >
+                  {category.label}
+                </AnimatedButton>
               ))}
             </div>
-            {filterNews(internalNews).length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500">Новостей не найдено</p>
-              </div>
-            )}
-          </TabsContent>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="external" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filterNews(externalNews).map((news) => (
-                <NewsCard key={news.id} news={news} />
-              ))}
-            </div>
-            {filterNews(externalNews).length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500">Внешних новостей не найдено</p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Настройте RSS-ленту в административной панели
-                </p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+        {/* Список новостей */}
+        <div className="grid gap-6">
+          {filteredNews.length === 0 ? (
+            <Card className="shadow-lg">
+              <CardContent className="p-12 text-center">
+                <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">Нет новостей</h3>
+                <p className="text-gray-500">В выбранной категории пока нет новостей</p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredNews.map(item => (
+              <Card key={item.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-2xl text-gray-800 mb-3">
+                        {item.title}
+                      </CardTitle>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {formatDate(item.date)}
+                        </div>
+                        <Badge className={getPriorityColor(item.priority)}>
+                          {item.priority === 'high' && 'Важно'}
+                          {item.priority === 'medium' && 'Обычное'}
+                          {item.priority === 'low' && 'Информация'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {item.image && (
+                    <img 
+                      src={item.image} 
+                      alt={item.title}
+                      className="w-full h-48 object-cover rounded-lg mb-4"
+                    />
+                  )}
+                  <p className="text-gray-700 text-lg leading-relaxed">
+                    {item.content}
+                  </p>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
